@@ -1,102 +1,49 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const { google } = require('googleapis');
-const fs = require('fs');
-const path = require('path');
-const bcrypt = require('bcrypt');
+const { GoogleSpreadsheet } = require('google-spreadsheet');
+const bcrypt = require('bcryptjs');  // meglio bcryptjs per deploy su Render
 
 const app = express();
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
-// ====== CONFIG GOOGLE SHEETS ======
-const SHEET_ID = process.env.SHEET_ID || 'INSERISCI_ID_DEL_TUO_FOGLIO';
-const SHEET_NAME = process.env.SHEET_NAME || 'Foglio1';
+const SHEET_ID = process.env.SHEET_ID;
+const CREDENTIALS_PATH = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
-const auth = new google.auth.GoogleAuth({
-    keyFile: path.join(__dirname, 'credentials.json'),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets']
-});
-const sheets = google.sheets({ version: 'v4', auth });
-
-async function getUsers() {
-    const res = await sheets.spreadsheets.values.get({
-        spreadsheetId: SHEET_ID,
-        range: `${SHEET_NAME}!A2:C`
-    });
-    return res.data.values || [];
+if (!SHEET_ID || !CREDENTIALS_PATH) {
+  console.error('Errore: variabili d\'ambiente SHEET_ID o GOOGLE_APPLICATION_CREDENTIALS non settate');
+  process.exit(1);
 }
 
-async function addUser(username, password) {
-    const hashed = await bcrypt.hash(password, 10);
-    await sheets.spreadsheets.values.append({
-        spreadsheetId: SHEET_ID,
-        range: `${SHEET_NAME}!A:C`,
-        valueInputOption: 'RAW',
-        requestBody: {
-            values: [[username, hashed, 0]]
-        }
-    });
+let doc;
+
+async function accessSheet() {
+  try {
+    doc = new GoogleSpreadsheet(SHEET_ID);
+    // Carica credenziali da file JSON tramite require dinamico
+    const creds = require(CREDENTIALS_PATH);
+    await doc.useServiceAccountAuth(creds);
+    await doc.loadInfo();
+    console.log('Foglio Google caricato con successo:', doc.title);
+  } catch (err) {
+    console.error('Errore accesso Google Sheet:', err);
+    throw err;
+  }
 }
 
-async function updatePoints(username, points) {
-    const users = await getUsers();
-    const rowIndex = users.findIndex(u => u[0] === username);
-    if (rowIndex >= 0) {
-        await sheets.spreadsheets.values.update({
-            spreadsheetId: SHEET_ID,
-            range: `${SHEET_NAME}!C${rowIndex + 2}`,
-            valueInputOption: 'RAW',
-            requestBody: {
-                values: [[points]]
-            }
-        });
-    }
-}
-
-app.post('/register', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        if (!username || !password) return res.json({ success: false, message: 'username e password richiesti' });
-        const users = await getUsers();
-        if (users.some(u => u[0] === username)) {
-            return res.json({ success: false, message: 'Username già esistente' });
-        }
-        await addUser(username, password);
-        res.json({ success: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Errore server' });
-    }
+// Chiamalo una volta all'avvio
+accessSheet().catch(err => {
+  console.error('Impossibile inizializzare Google Sheet:', err);
+  process.exit(1);
 });
 
-app.post('/login', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        const users = await getUsers();
-        const user = users.find(u => u[0] === username);
-        if (!user) return res.json({ success: false, message: 'Utente non trovato' });
-
-        const match = await bcrypt.compare(password, user[1]);
-        if (!match) return res.json({ success: false, message: 'Password errata' });
-
-        res.json({ success: true, points: user[2] || 0 });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Errore server' });
-    }
-});
-
-app.post('/savePoints', async (req, res) => {
-    try {
-        const { username, points } = req.body;
-        await updatePoints(username, points);
-        res.json({ success: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Errore server' });
-    }
+// Qui puoi mettere i tuoi endpoint API (es. login, flashcards, punteggi...)
+// esempio minimal:
+app.get('/', (req, res) => {
+  res.send('App giapponese attiva');
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server avviato su porta ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server avviato su porta ${PORT}`);
+});
+
