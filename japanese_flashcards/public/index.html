@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Japanese Flashcards</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div id="auth-section" class="card">
+            <h2>Accedi o Registrati</h2>
+            <input type="text" id="username" placeholder="Username">
+            <input type="password" id="password" placeholder="Password">
+            <div class="row">
+                <button onclick="register()">Registrati</button>
+                <button onclick="login()">Login</button>
+            </div>
+            <p id="auth-message" class="muted"></p>
+        </div>
+
+        <div id="game-section" class="card" style="display:none;">
+            <h2>Benvenuto <span id="userDisplay"></span></h2>
+            <div class="meta">Punti: <span id="pointsDisplay">0</span></div>
+            <select id="mode" onchange="startMode()">
+                <option value="">Seleziona modalità</option>
+                <option value="kanji">Kanji → Significato</option>
+                <option value="pronunciaJP">Parola JP → Pronuncia</option>
+                <option value="italianoJP">Italiano → Giapponese</option>
+            </select>
+
+            <div id="flashcard" class="flashcard">Seleziona una modalità</div>
+
+            <input type="text" id="answer" placeholder="Risposta" autocomplete="off">
+            <div class="row">
+                <button onclick="checkAnswer()">Invia</button>
+                <button onclick="logout()">Logout</button>
+            </div>
+
+            <p id="result" class="muted"></p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
